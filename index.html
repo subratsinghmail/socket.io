@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Socket.IO chat</title>
+    <style>
+      body {
+        margin: 0;
+        padding-bottom: 3rem;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Helvetica, Arial, sans-serif;
+      }
+
+      #form {
+        background: rgba(0, 0, 0, 0.15);
+        padding: 0.25rem;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        height: 3rem;
+        box-sizing: border-box;
+        backdrop-filter: blur(10px);
+      }
+
+      #input {
+        border: none;
+        padding: 0 1rem;
+        flex-grow: 1;
+        border-radius: 2rem;
+        margin: 0.25rem;
+      }
+
+      #input:focus {
+        outline: none;
+      }
+
+      #form > button {
+        background: #333;
+        border: none;
+        padding: 0 1rem;
+        margin: 0.25rem;
+        border-radius: 3px;
+        outline: none;
+        color: #fff;
+      }
+
+      #messages {
+        list-style-type: none;
+        margin: 0;
+        padding: 0;
+        padding: 20px;
+      }
+
+      #messages > li {
+        padding: 0.5rem 1rem;
+      }
+
+      #messages > li:nth-child(odd) {
+        background: #efefef;
+      }
+      #messages > div h3 {
+        margin: 0;
+        margin-bottom: 0px;
+        padding: 0;
+        font-size: 13px;
+        font-weight: 600;
+        color: #000;
+        margin-right: 10px;
+        width: 500px;
+        word-wrap: anywhere;
+      }
+      #messages > div > span {
+          font-size: 10px;
+          margin-bottom: 5px;
+          display: block;
+          
+      }
+      #messages > div h5 {
+            margin: 0;
+        }
+        #messages > div {
+          display: flex;
+          flex-direction: row-reverse;
+          justify-content: flex-end;
+          margin-bottom: 10px;
+      }
+      .header_title {
+        font-size: 16px;
+        text-transform: capitalize;
+        text-align: center;
+        font-weight: 100;
+        margin-bottom: 0px;
+    }
+    </style>
+  </head>
+
+  <body>
+    <div class="header_section">
+      <h2 class="header_title">customer support</h2>
+    </div>
+    <ul id="messages"></ul>
+
+    <div id="typing">  </div>
+    <form id="form" action="">
+      <input id="input" autocomplete="off" /><button type="submit">Send</button>
+    </form>
+  </body>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/uuid@latest/dist/umd/uuidv4.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+
+  <script>
+    var socket = io({
+      auth:{
+        token:"123456@gmail.com"
+      }
+    });
+    // var uploader = new SocketIOFileClient(socket);
+    var roomID;
+    var form = document.getElementById("form");
+    var input = document.getElementById("input");
+    var messsages = document.getElementById("messages");
+
+   
+    roomID = uuidv4();
+
+    // creates a new user ID
+    socket.emit("create", roomID);
+
+    socket.on("pvt_file", (file_info) => {
+
+      console.log(file_info);
+
+      // showFile(file_info)
+      const div=document.createElement("div");
+      div.innerHTML=`<h3> ${file_info.name}</h3>
+      <a href="http://localhost:8080/media?fileName=${file_info.uploadDir}">Download</a>
+      `
+      
+
+      document.getElementById("messages").appendChild(div);
+
+      sendAcknowledgement()
+
+    });
+
+    //event listens for a event listener
+    socket.on("pvt_message", (message) => {
+      console.log(message);
+
+      showMessage(message);
+
+      console.log(document.hidden);
+
+      if (!document.hidden && message.username == "admin") {
+        sendAcknowledgement(message.messageID);
+      }
+
+      // setTimeout((message)=>{
+      //   if(message.username=='client'){
+      //   sendAcknowledgement(message.messageID);
+      //   }
+      // },1000)
+    });
+
+    function sendAcknowledgement(messageID) {
+      socket.emit("ack", 1, roomID, messageID);
+    }
+
+    socket.on("save_room_id", (ID) => {
+      roomID = ID;
+    });
+
+    //listens for an event.
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+
+      console.log(input);
+      if (input.value && roomID) {
+        console.log(roomID);
+        socket.emit(
+          "private_message",
+          messageFormat("client", input.value, roomID)
+        );
+        //reset a value if the chat is sent
+        input.value = "";
+      }
+
+      input.focus();
+    });
+
+    form.addEventListener("keypress",(function(){
+      // socket.emit('emit_type',{roomID,'user'})
+
+      console.log('typing event initiated.')
+     socket.emit('emit_type',typingFormat('client', 'is typing',roomID))
+
+
+
+    }))
+   
+
+    socket.on('typing',(message,user)=>{
+
+     console.log('typing effect confirmed')
+
+       const span=document.createElement('span');
+       span.innerHTML=`<span> ${user}${messsages} </span> `
+
+
+       document.getElementById("typing").appendChild(span);
+
+       setTimeout(()=>{
+            let a=document.getElementById("typing")
+            a.innerHTML='';
+       },1500)
+
+    })
+    
+    //appends a message to the DOM
+    function showMessage(msg) {
+      const div = document.createElement("div");
+      div.innerHTML = `  <span> ${msg.time}</span>
+      <h3>${msg.username}: ${msg.text}</h3>
+                
+
+    `;
+
+      document.getElementById("messages").appendChild(div);
+    }
+
+
+    function download(fileDirectory){
+      console.log(fileDirectory)
+       fetch(`http://localhost:8080/media?fileName=data/123.png`).then((res)=>{console.log(res)}).catch((err)=>{
+         console.log
+       })
+      
+  }
+
+
+    function showFile(fileInfo){
+      
+
+    }
+
+
+    function messageFormat(user, message, room) {
+      return {
+        user: user,
+        message,
+        room,
+        time_sent:moment().format('h:mm a'),
+        messageID:uuidv4(),
+        read:0
+      };
+    }
+ 
+     function typingFormat(user,message,room){
+       return {
+         user,
+         message,
+         roomID
+       }
+     }
+    
+ 
+ </script>
+</html>
